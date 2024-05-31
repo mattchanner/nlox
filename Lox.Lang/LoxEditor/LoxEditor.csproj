@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+		<ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="Lox.syn" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="Lox.syn" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Alsing.SyntaxBox" Version="2.0.1" />
+	  <PackageReference Include="DockPanelSuite" Version="3.1.0" />
+	  <PackageReference Include="DockPanelSuite.ThemeVS2015" Version="3.1.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Lox\Lox.csproj" />
+	</ItemGroup>
+
+</Project>
