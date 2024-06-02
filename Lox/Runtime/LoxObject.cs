@@ -1,18 +1,25 @@
-﻿using Lox.Lang;
+﻿using Lox.Parser;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 public class LoxObject
 {
     protected bool Equals(LoxObject other)
     {
-        return Nullable.Equals(this.number, other.number) 
-               && this.boolean == other.boolean 
-               && this.str == other.str 
-               && this.list.Equals(other.list) 
-               && Equals(this.instance, other.instance) 
-               && Equals(this.callable, other.callable) 
-               && Equals(this.@class, other.@class) 
+        bool ListEquals()
+        {
+            if (ReferenceEquals(null, list)) return ReferenceEquals(null, other.list);
+            if (ReferenceEquals(null, other.list)) return false;
+            return this.list.Equals(other.list);
+        }
+
+        return Nullable.Equals(number, other.number)
+               && boolean == other.boolean
+               && str == other.str
+               && ListEquals()
+               && Equals(instance, other.instance)
+               && Equals(callable, other.callable)
+               && Equals(@class, other.@class)
                && LoxType == other.LoxType;
     }
 
@@ -20,13 +27,21 @@ public class LoxObject
     {
         if (ReferenceEquals(null, obj)) return false;
         if (ReferenceEquals(this, obj)) return true;
-        if (obj.GetType() != this.GetType()) return false;
+        if (obj.GetType() != GetType()) return false;
         return Equals((LoxObject)obj);
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(this.number, this.boolean, this.str, this.list, this.instance, this.callable, this.@class, (int)LoxType);
+        return HashCode.Combine(
+            number, 
+            boolean, 
+            str, 
+            list, 
+            instance, 
+            callable, 
+            @class, 
+            (int)LoxType);
     }
 
     public static readonly LoxObject Nil = new();
@@ -35,69 +50,69 @@ public class LoxObject
 
     private double? number = null;
     private bool? boolean = null;
-    private string? str = null;
-    private LoxList list = null;
-    private LoxInstance? instance;
-    private LoxNativeInstance? nativeInstance;
-    private ILoxCallable? callable;
-    private LoxClass? @class;
+    private readonly string? str = null;
+    private readonly LoxList? list = null;
+    private readonly LoxInstance? instance;
+    private readonly LoxNativeInstance? nativeInstance;
+    private readonly ILoxCallable? callable;
+    private readonly LoxClass? @class;
 
     private LoxObject()
     {
-        this.LoxType = LoxType.Nil;
+        LoxType = LoxType.Nil;
     }
 
     public LoxObject(LoxNativeInstance nativeInstance)
     {
         this.nativeInstance = nativeInstance;
-        this.LoxType = LoxType.NativeInstance;
+        LoxType = LoxType.NativeInstance;
     }
 
     public LoxObject(LoxClass @class)
     {
         this.@class = @class;
-        this.LoxType = LoxType.Class;
+        LoxType = LoxType.Class;
     }
 
     public LoxObject(ILoxCallable callable)
     {
         this.callable = callable;
-        this.LoxType = LoxType.Callable;
+        LoxType = LoxType.Callable;
     }
 
     public LoxObject(LoxInstance instance)
     {
         this.instance = instance;
-        this.LoxType = LoxType.Instance;
+        LoxType = LoxType.Instance;
     }
 
     public LoxObject(bool boolean)
     {
         this.boolean = boolean;
-        this.LoxType = LoxType.Bool;
+        LoxType = LoxType.Bool;
     }
 
     public LoxObject(string str)
     {
         this.str = str;
-        this.LoxType = LoxType.Str;
+        LoxType = LoxType.Str;
     }
 
     public LoxObject(double num)
     {
-        this.number = num;
-        this.LoxType = LoxType.Num;
+        number = num;
+        LoxType = LoxType.Num;
     }
 
     public LoxObject(List<LoxObject> list)
     {
-        this.LoxType = LoxType.List;
+        LoxType = LoxType.List;
         this.list = new LoxList(list);
     }
 
     public LoxObject(LoxList list)
     {
-        this.LoxType = LoxType.List;
+        LoxType = LoxType.List;
         this.list = list;
     }
 
@@ -106,23 +121,23 @@ public class LoxObject
         switch (token.Type)
         {
             case TokenType.NUMBER:
-                this.LoxType = LoxType.Num;
-                this.number = double.Parse(token.Lexeme);
+                LoxType = LoxType.Num;
+                number = double.Parse(token.Lexeme);
                 break;
             case TokenType.STRING:
-                this.LoxType = LoxType.Str;
-                this.str = token.Lexeme;
+                LoxType = LoxType.Str;
+                str = token.Lexeme;
                 break;
             case TokenType.TRUE:
-                this.LoxType = LoxType.Bool;
-                this.boolean = true;
+                LoxType = LoxType.Bool;
+                boolean = true;
                 break;
             case TokenType.FALSE:
-                this.LoxType = LoxType.Bool;
-                this.boolean = false;
+                LoxType = LoxType.Bool;
+                boolean = false;
                 break;
             case TokenType.NIL:
-                this.LoxType = LoxType.Nil;
+                LoxType = LoxType.Nil;
                 break;
             default:
                 throw new RuntimeError(token, "Invalid token provided when constructing an object.");
@@ -137,96 +152,96 @@ public class LoxObject
     public bool IsNil => LoxType == LoxType.Nil;
     public bool IsBool => LoxType == LoxType.Bool;
     public bool IsList => LoxType == LoxType.List;
-    public bool IsCallable => LoxType == LoxType.Callable;
+    public bool IsCallable => LoxType is LoxType.Callable or LoxType.Class;
     public bool IsInstance => LoxType == LoxType.Instance;
     public bool IsNativeInstance => LoxType == LoxType.NativeInstance;
 
-    public double? AsNumber() => this.number;
+    public double? AsNumber() => number;
 
     public double GetNumber()
     {
         if (IsNumber)
-            return this.number.GetValueOrDefault();
+            return number.GetValueOrDefault();
 
         throw new RuntimeError("LoxObject is not a number.");
     }
 
-    public string? AsString() => this.str;
+    public string? AsString() => str;
 
     public string GetString()
     {
         if (IsStr)
-            return this.str!;
+            return str!;
 
         throw new RuntimeError("LoxObject is not a string.");
     }
 
-    public bool? AsBool() => this.boolean;
+    public bool? AsBool() => boolean;
 
     public bool GetBool()
     {
         if (IsBool)
-            return this.boolean!.Value;
+            return boolean!.Value;
 
         throw new RuntimeError("LoxObject is not a boolean.");
     }
 
-    public ILoxCallable? AsCallable() => this.callable;
+    public ILoxCallable? AsCallable() => callable ?? @class;
 
     public ILoxCallable GetCallable()
     {
         if (IsCallable)
-            return this.callable!;
+            return callable ?? @class;
 
         throw new RuntimeError("LoxObject is not a callable.");
     }
 
-    public LoxInstance? AsLoxInstance() => this.instance;
+    public LoxInstance? AsLoxInstance() => instance;
 
     public LoxInstance GetLoxInstance()
     {
         if (IsInstance)
-            return this.instance!;
+            return instance!;
 
         throw new RuntimeError("LoxObject is not a lox instance.");
     }
 
-    public LoxClass? AsClass() => this.@class;
+    public LoxClass? AsClass() => @class;
 
     public LoxClass GetClass()
     {
         if (IsClass)
-            return this.@class!;
+            return @class!;
 
         throw new RuntimeError("LoxObject is not a lox class.");
     }
 
-    public LoxList AsList() => this.list;
+    public LoxList AsList() => list;
 
     public LoxList GetList()
     {
         if (IsList)
-            return this.list!;
+            return list!;
 
         throw new RuntimeError("LoxObject is not a list.");
     }
 
     public LoxNativeInstance? AsNativeInstance()
     {
-        return this.nativeInstance!; 
+        return nativeInstance!;
     }
 
     public LoxNativeInstance GetNativeInstance()
     {
         if (IsNativeInstance)
-            return this.nativeInstance!;
+            return nativeInstance!;
 
         throw new RuntimeError("LoxObject is not a native instance.");
     }
 
     public bool IsTruthy()
     {
-        if (IsBool) return this.boolean!.Value;
+        if (IsBool) return boolean!.Value;
         return !IsNil;
     }
 
@@ -250,7 +265,7 @@ public class LoxObject
     {
         if (left.IsNumber && right.IsNumber)
             return new LoxObject(left.GetNumber() + right.GetNumber());
-        
+
         if (left.IsStr && right.IsStr)
             return new LoxObject(left.GetString() + right.GetString());
 
@@ -289,6 +304,12 @@ public class LoxObject
 
     public static bool operator ==(LoxObject left, LoxObject right)
     {
+        if (ReferenceEquals(null, left))
+            return ReferenceEquals(null, right);
+
+        if (ReferenceEquals(null, right))
+            return false;
+
         if (left.LoxType != right.LoxType) return false;
         return left.LoxType switch
         {
@@ -392,14 +413,14 @@ public class LoxObject
     {
         string? result = LoxType switch
         {
-            LoxType.Num => this.number!.ToString(),
-            LoxType.Bool => this.boolean!.ToString(),
-            LoxType.Callable => this.callable!.ToString(),
-            LoxType.Class => $"<class {this.@class!.Name}>",
-            LoxType.Instance => $"<instance {this.instance!.ToString()}>",
-            LoxType.List => $"<list {this.list!.ToString()}>",
+            LoxType.Num => number!.ToString(),
+            LoxType.Bool => boolean!.ToString(),
+            LoxType.Callable => callable!.ToString(),
+            LoxType.Class => $"<class {@class!.Name}>",
+            LoxType.Instance => $"<instance {instance!.ToString()}>",
+            LoxType.List => $"<list {list!.ToString()}>",
             LoxType.Nil => "nil",
-            LoxType.Str => this.str!,
+            LoxType.Str => str!,
             _ => "Unknown type"
         };
 

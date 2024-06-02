@@ -1,6 +1,6 @@
 ﻿using static System.DateTime;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 internal class Clock : ILoxCallable
 {

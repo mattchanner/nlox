@@ -1,29 +1,28 @@
 ﻿using System.Text;
-
-using Lox.Lang;
+using Lox.Parser;
 using Microsoft.CSharp.RuntimeBinder;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 public class LoxList
 {
     public LoxList(List<LoxObject?> items)
     {
-        this.Items = items;
+        Items = new List<LoxObject>(items);
     }
 
     public LoxList(LoxList first, LoxList second)
     {
-        this.Items = new List<LoxObject>();
-        this.Items.AddRange(first.Items);
-        this.Items.AddRange(second.Items);
+        Items = new List<LoxObject>();
+        Items.AddRange(first.Items);
+        Items.AddRange(second.Items);
     }
 
     public LoxList(LoxList first, params LoxObject[] rest)
     {
-        this.Items = new List<LoxObject>();
-        this.Items.AddRange(first.Items);
-        this.Items.AddRange(rest);
+        Items = new List<LoxObject>();
+        Items.AddRange(first.Items);
+        Items.AddRange(rest);
     }
 
     public LoxObject Count()
@@ -33,19 +32,19 @@ public class LoxList
 
     public LoxObject At(int index)
     {
-        return this.Items[index];
+        return Items[index];
     }
 
     public LoxObject Remove(int index)
     {
-        LoxObject value = this.Items[index];
-        this.Items.RemoveAt(index);
+        LoxObject value = Items[index];
+        Items.RemoveAt(index);
         return value;
     }
 
     public void Add(LoxObject item)
     {
-        this.Items.Add(item);
+        Items.Add(item);
     }
 
     protected bool Equals(LoxList other)
@@ -57,7 +56,7 @@ public class LoxList
     {
         if (ReferenceEquals(null, obj)) return false;
         if (ReferenceEquals(this, obj)) return true;
-        if (obj.GetType() != this.GetType()) return false;
+        if (obj.GetType() != GetType()) return false;
         return Equals((LoxList)obj);
     }
 

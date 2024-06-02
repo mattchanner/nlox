@@ -1,12 +1,15 @@
-﻿using Lox.Lang;
+﻿using Lox.Ast;
+using Lox.Runtime;
 
-namespace Lox;
+namespace Lox.Parser;
 
-public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisitor<object?>, IStmtVisitor<object?>
+public class Resolver(Interpreter interpreter, IReporter reporter) 
+    : IExprVisitor<object?>, IStmtVisitor<object?>
 {
     private readonly Stack<Dictionary<string, bool>> scopes = new();
     private FunctionType currentFunction = FunctionType.None;
     private ClassType currentClass = ClassType.None;
+    private bool isInWhileLoop;
 
     public object? VisitAssignment(AssignmentExpr assignment)
     {
@@ -50,9 +53,9 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
     public object? VisitVariable(VariableExpr variable)
     {
         // Check to see if the variable is being accessed inside its own initializer
-        if (this.scopes.Count > 0)
+        if (scopes.Count > 0)
         {
-            Dictionary<string, bool> peeked = this.scopes.Peek();
+            Dictionary<string, bool> peeked = scopes.Peek();
             if (peeked.TryGetValue(variable.Name.Lexeme, out bool isInitialized) && !isInitialized)
                 reporter.Error(variable.Name.Line, "Can't read local variable in its own initializer.");
         }
@@ -68,7 +71,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
         foreach (Expr argument in call.Arguments)
             Resolve(argument);
-        
+
         return null;
     }
 
@@ -94,8 +97,8 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
     public object? VisitThis(ThisExpr thisExpr)
     {
-        if (this.currentClass != ClassType.Class)
-            reporter.Error(thisExpr.Keyword, "Can't use 'this' outside of a class.");
+        if (currentClass == ClassType.None)
+            reporter.Error(thisExpr.Keyword, "Can't use 'self' outside of a class.");
 
         ResolveLocal(thisExpr, thisExpr.Keyword);
 
@@ -104,13 +107,13 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
     public object? VisitSuper(SuperExpr superExpr)
     {
-        if (this.currentClass == ClassType.None)
+        if (currentClass == ClassType.None)
         {
-            reporter.Error(superExpr.Keyword, "Can't use 'super' outside of a class.");
-        } 
-        else if (this.currentClass != ClassType.Subclass)
+            reporter.Error(superExpr.Keyword, "Can't use 'base' outside of a class.");
+        }
+        else if (currentClass != ClassType.Subclass)
         {
-            reporter.Error(superExpr.Keyword, "Can't use 'super' in a class with no subclass.");
+            reporter.Error(superExpr.Keyword, "Can't use 'base' in a class with no subclass.");
         }
 
         ResolveLocal(superExpr, superExpr.Keyword);
@@ -127,7 +130,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
     public object? VisitReturn(ReturnStmt returnStatement)
     {
-        if (this.currentFunction == FunctionType.None)
+        if (currentFunction == FunctionType.None)
         {
             reporter.Error(returnStatement.Keyword.Line, "Can't return from top-level code.");
             return null;
@@ -135,7 +138,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
         if (returnStatement.Value != null)
         {
-            if (this.currentFunction == FunctionType.Initializer)
+            if (currentFunction == FunctionType.Initializer)
             {
                 reporter.Error(returnStatement.Keyword, "Can't return a value from an initializer");
             }
@@ -152,7 +155,27 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
         Define(function.Name);
 
         ResolveFunction(function, FunctionType.Function);
-        
+
+        return null;
+    }
+
+    public object? VisitBreak(BreakStmt breakStmt)
+    {
+        if (!isInWhileLoop)
+        {
+            reporter.Error(breakStmt.Keyword, "Can't break outside of a for / while loop.");
+        }
+
+        return null;
+    }
+
+    public object? VisitContinue(ContinueStmt continueStmt)
+    {
+        if (!isInWhileLoop)
+        {
+            reporter.Error(continueStmt.Keyword, "Can't continue outside of a for / while loop.");
+        }
+
         return null;
     }
 
@@ -160,9 +183,23 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
     {
         Resolve(ifStatement.Condition);
         Resolve(ifStatement.ThenBranch);
-        
+
         if (ifStatement.ElseBranch != null)
             Resolve(ifStatement.ElseBranch);
+
+        return null;
+    }
+
+    public object? VisitFor(ForStatement forStatement)
+    {
+        if (forStatement.Initializer != null)
+            Resolve(forStatement.Initializer!);
+
+        if (forStatement.Condition != null)
+            Resolve(forStatement.Condition!);
+
+        if (forStatement.Increment != null)
+            Resolve(forStatement.Increment!);
 
         return null;
     }
@@ -170,8 +207,9 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
     public object? VisitWhile(WhileStmt whileStatement)
     {
         Resolve(whileStatement.Condition);
+        isInWhileLoop = true;
         Resolve(whileStatement.Body);
-
+        isInWhileLoop = false;
         return null;
     }
 
@@ -194,7 +232,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
         }
 
         Define(var.Name);
-        
+
         return null;
     }
 
@@ -226,22 +264,22 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
         if (@class.Superclass != null)
         {
-            this.currentClass = ClassType.Subclass;
+            currentClass = ClassType.Subclass;
 
             Resolve(@class.Superclass);
 
             BeginScope();
-            this.scopes.Peek()["super"] = true;
+            scopes.Peek()["super"] = true;
         }
 
         BeginScope();
 
-        this.scopes.Peek().Add("this", true);
+        scopes.Peek().Add("self", true);
 
         foreach (FunctionStmt func in @class.Methods)
         {
             FunctionType funcType = FunctionType.Method;
-            
+
             if (func.Name.Lexeme == "init")
             {
                 funcType = FunctionType.Initializer;
@@ -255,7 +293,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
         if (@class.Superclass != null)
             EndScope();
 
-        this.currentClass = enclosingClass;
+        currentClass = enclosingClass;
         return null;
     }
 
@@ -270,7 +308,8 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
         stmt.Accept(this);
     }
 
-    private void Resolve(Expr expr) {
+    private void Resolve(Expr expr)
+    {
         expr.Accept(this);
     }
 
@@ -311,7 +350,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
         EndScope();
 
-        this.currentFunction = enclosingFunction;
+        currentFunction = enclosingFunction;
     }
 
     private void ResolveLocal(Expr expr, Token name)
@@ -320,7 +359,7 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
         //for (int i = scopes.Count - 1; i >= 0; i--)
         for (int i = 0; i < scopes.Count; i++)
         {
-            if (this.scopes.ElementAt(i).ContainsKey(name.Lexeme))
+            if (scopes.ElementAt(i).ContainsKey(name.Lexeme))
             {
                 interpreter.Resolve(expr, i);
                 return;
@@ -337,14 +376,14 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
     private void EndScope()
     {
-        this.scopes.Pop();
+        scopes.Pop();
     }
 
     private void Declare(Token name)
     {
-        if (this.scopes.Count == 0) return;
+        if (scopes.Count == 0) return;
 
-        Dictionary<string, bool> scope = this.scopes.Peek();
+        Dictionary<string, bool> scope = scopes.Peek();
 
         if (scope.ContainsKey(name.Lexeme))
         {
@@ -356,9 +395,9 @@ public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisito
 
     private void Define(Token name)
     {
-        if (this.scopes.Count == 0) return;
+        if (scopes.Count == 0) return;
 
-        Dictionary<string, bool> scope = this.scopes.Peek();
+        Dictionary<string, bool> scope = scopes.Peek();
         scope[name.Lexeme] = true;
     }
 }

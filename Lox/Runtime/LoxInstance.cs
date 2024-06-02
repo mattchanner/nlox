@@ -1,6 +1,6 @@
-﻿using Lox.Lang;
+﻿using Lox.Parser;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 public class LoxInstance(LoxClass @class)
 {
@@ -8,7 +8,7 @@ public class LoxInstance(LoxClass @class)
 
     public LoxObject? Get(Token name)
     {
-        if (this.fields.TryGetValue(name.Lexeme, out var value))
+        if (fields.TryGetValue(name.Lexeme, out var value))
             return value;
 
         LoxFunction? method = @class.FindMethod(name.Lexeme);
@@ -20,7 +20,7 @@ public class LoxInstance(LoxClass @class)
 
     public void Set(Token name, LoxObject? value)
     {
-        this.fields[name.Lexeme] = value;
+        fields[name.Lexeme] = value;
     }
 
     public override string ToString() => $"{@class.Name} instance";

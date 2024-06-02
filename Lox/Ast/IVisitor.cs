@@ -1,4 +1,4 @@
-﻿namespace Lox;
+﻿namespace Lox.Ast;
 
 public interface IExprVisitor<R>
 {
@@ -22,6 +22,8 @@ public interface IStmtVisitor<R>
 {
     R VisitReturn(ReturnStmt returnStatement);
     R VisitFunction(FunctionStmt function);
+    R VisitBreak(BreakStmt breakStmt);
+    R VisitContinue(ContinueStmt continueStmt);
     R VisitIfStmt(IfStmt ifStatement);
     R VisitWhile(WhileStmt whileStatement);
     R VisitBlock(BlockStmt block);
@@ -29,4 +31,5 @@ public interface IStmtVisitor<R>
     R VisitPrint(PrintStmt print);
     R VisitExpression(ExpressionStmt expression);
     R VisitClass(ClassStmt @class);
+    R VisitFor(ForStatement forStatement);
 }

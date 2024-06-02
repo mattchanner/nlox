@@ -1,7 +1,9 @@
-﻿using System.Linq.Expressions;
-using Lox.Lang;
+﻿using System.Diagnostics;
 
-namespace Lox;
+using Lox.Ast;
+using Lox.Runtime;
+
+namespace Lox.Parser;
 
 public class Parser(List<Token> tokens, IReporter reporter)
 {
@@ -111,9 +113,27 @@ public class Parser(List<Token> tokens, IReporter reporter)
         if (Match(TokenType.WHILE)) return WhileStatement();
         if (Match(TokenType.PRINT)) return PrintStatement();
         if (Match(TokenType.RETURN)) return ReturnStatement();
+        if (Match(TokenType.BREAK)) return BreakStatement();
+        if (Match(TokenType.CONTINUE)) return ContinueStatement();
         if (Match(TokenType.LEFT_BRACE)) return new BlockStmt(Block());
 
         return ExpressionStatement();
+    }
+
+    private Stmt BreakStatement()
+    {
+        Token keyword = Previous();
+        Consume(TokenType.SEMICOLON, "Expect ';' after return break.");
+
+        return new BreakStmt(keyword);
+    }
+
+    private Stmt ContinueStatement()
+    {
+        Token keyword = Previous();
+        Consume(TokenType.SEMICOLON, "Expect ';' after continue.");
+
+        return new ContinueStmt(keyword);
     }
 
     private Stmt ReturnStatement()
@@ -153,7 +173,8 @@ public class Parser(List<Token> tokens, IReporter reporter)
     /// <returns>The statement list</returns>
     private Stmt ForStatement()
     {
-        
+        Token forToken = Previous();
+
         Consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
 
         Stmt? initializer;
@@ -174,24 +195,16 @@ public class Parser(List<Token> tokens, IReporter reporter)
         if (!Check(TokenType.RIGHT_PAREN))
             increment = Expression();
 
-        Consume(TokenType.RIGHT_PAREN, "Exepcted ')' after clauses.");
+        Consume(TokenType.RIGHT_PAREN, "Expect ')' after clauses.");
 
         Stmt body = Statement();
 
-        if (increment != null)
-        {
-            body = new BlockStmt([body, new ExpressionStmt(increment)]);
-        }
-
-        if (condition == null)
-            condition = new LiteralExpr(LoxObject.True);
-
-        body = new WhileStmt(condition, body);
-
-        if (initializer != null)
-            body = new BlockStmt([initializer, body]);
-
-        return body;
+        return new ForStatement(
+            forToken, 
+            initializer, 
+            condition, 
+            increment == null ? null : new ExpressionStmt(increment), 
+            body);
     }
 
     private Stmt IfStatement()
@@ -214,7 +227,7 @@ public class Parser(List<Token> tokens, IReporter reporter)
     {
         Consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.");
         Expr condition = Expression();
-        
+
         Consume(TokenType.RIGHT_PAREN, "Exepect ')' after condition");
         Stmt body = Statement();
 
@@ -256,7 +269,7 @@ public class Parser(List<Token> tokens, IReporter reporter)
     private Expr Assignment()
     {
         Expr expr = Or();
-        
+
         if (Match(TokenType.EQUAL))
         {
             Token equals = Previous();
@@ -457,7 +470,7 @@ public class Parser(List<Token> tokens, IReporter reporter)
         if (Match(TokenType.SUPER))
         {
             Token keyword = Previous();
-            Consume(TokenType.DOT, "Expect '.' after 'super'.");
+            Consume(TokenType.DOT, "Expect '.' after 'base'.");
             Token method = Consume(TokenType.IDENTIFIER, "Expect superclass method name");
             return new SuperExpr(keyword, method);
         }
@@ -541,7 +554,7 @@ public class Parser(List<Token> tokens, IReporter reporter)
         Advance();
         while (!IsAtEnd())
         {
-            if (Previous().Type == TokenType.SEMICOLON) 
+            if (Previous().Type == TokenType.SEMICOLON)
                 return;
 
             switch (Peek().Type)
@@ -592,6 +605,7 @@ public class Parser(List<Token> tokens, IReporter reporter)
         return Previous();
     }
 
+    [DebuggerStepThrough]
     private bool IsAtEnd()
     {
         return Peek().Type == TokenType.EOF;

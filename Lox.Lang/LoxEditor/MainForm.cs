@@ -4,7 +4,8 @@ using System.Text;
 using Alsing.Windows.Forms;
 
 using Lox;
-using Lox.Lang;
+using Lox.Ast;
+using Lox.Parser;
 using WeifenLuo.WinFormsUI.Docking;
 using Environment = System.Environment;
 

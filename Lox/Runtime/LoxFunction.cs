@@ -1,4 +1,6 @@
-﻿namespace Lox;
+﻿using Lox.Ast;
+
+namespace Lox.Runtime;
 
 public class LoxFunction(FunctionStmt function, Environment closure, bool isInitializer) : ILoxCallable
 {
@@ -7,7 +9,7 @@ public class LoxFunction(FunctionStmt function, Environment closure, bool isInit
     public LoxFunction Bind(LoxInstance instance)
     {
         Environment environment = new(closure);
-        environment.Define("this", new LoxObject(instance));
+        environment.Define("self", new LoxObject(instance));
         return new LoxFunction(function, environment, isInitializer);
     }
 
@@ -26,10 +28,10 @@ public class LoxFunction(FunctionStmt function, Environment closure, bool isInit
         }
         catch (ReturnException re)
         {
-            // If there is a return within the init method, make sure that "this" is returned
+            // If there is a return within the init method, make sure that "self" is returned
             // rather than nil
-            if (isInitializer) 
-                return closure.GetAt(0, "this");
+            if (isInitializer)
+                return closure.GetAt(0, "self");
 
             return re.Value;
         }

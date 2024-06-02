@@ -1,6 +1,4 @@
-﻿using Lox.Lang;
-
-namespace Lox;
+﻿namespace Lox.Parser;
 
 public class ParseError(Token token, string message) : Exception(message)
 {

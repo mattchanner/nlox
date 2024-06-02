@@ -1,4 +1,6 @@
-﻿using Lox.Lang;
+﻿using Lox.Ast;
+using Lox.Parser;
+using Lox.Runtime;
 
 namespace Lox;
 
@@ -8,10 +10,7 @@ public class LoxLang : IReporter
     private bool hasError = false;
     private bool hadRuntimeError = false;
 
-    public LoxLang()
-    {
-        interpreter = new(this);
-    }
+    public LoxLang() => interpreter = new(this);
 
     public void Reset()
     {
@@ -26,9 +25,10 @@ public class LoxLang : IReporter
 
     public void Run(string source)
     {
+        Reset();
         Scanner scanner = new(source, this);
         List<Token> tokens = scanner.ScanTokens();
-        Parser parser = new(tokens, this);
+        Parser.Parser parser = new(tokens, this);
         List<Stmt> statements = parser.Parse();
 
         if (hasError) return;

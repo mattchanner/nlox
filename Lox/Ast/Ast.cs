@@ -1,6 +1,7 @@
-﻿using Lox.Lang;
+﻿using Lox.Parser;
+using Lox.Runtime;
 
-namespace Lox;
+namespace Lox.Ast;
 
 public abstract class Stmt
 {
@@ -38,6 +39,20 @@ public class IfStmt(Expr condition, Stmt thenBranch, Stmt? elseBranch) : Stmt
     public override R Accept<R>(IStmtVisitor<R> visitor)
     {
         return visitor.VisitIfStmt(this);
+    }
+}
+
+public class ForStatement(Token keyword, Stmt? initializer, Expr? condition, Stmt? increment, Stmt body) : Stmt
+{
+    public Token Keyword { get; } = keyword;
+    public Stmt? Initializer { get; } = initializer;
+    public Expr? Condition { get; } = condition;
+    public Stmt? Increment { get; } = increment;
+    public Stmt Body { get; } = body;
+
+    public override R Accept<R>(IStmtVisitor<R> visitor)
+    {
+        return visitor.VisitFor(this);
     }
 }
 
@@ -82,6 +97,26 @@ public class ReturnStmt(Token keyword, Expr? value) : Stmt
     public override R Accept<R>(IStmtVisitor<R> visitor)
     {
         return visitor.VisitReturn(this);
+    }
+}
+
+public class BreakStmt(Token keyword) : Stmt
+{
+    public Token Keyword { get; } = keyword;
+
+    public override R Accept<R>(IStmtVisitor<R> visitor)
+    {
+        return visitor.VisitBreak(this);
+    }
+}
+
+public class ContinueStmt(Token keyword) : Stmt
+{
+    public Token Keyword { get; } = keyword;
+
+    public override R Accept<R>(IStmtVisitor<R> visitor)
+    {
+        return visitor.VisitContinue(this);
     }
 }
 
@@ -198,7 +233,7 @@ public class LambdaExpression(List<Token> parameters, List<Stmt> body) : Expr
     }
 }
 
-public class ClassStmt(Token name, VariableExpr? superclass, List<FunctionStmt> methods) :  Stmt
+public class ClassStmt(Token name, VariableExpr? superclass, List<FunctionStmt> methods) : Stmt
 {
     public Token Name { get; } = name;
     public VariableExpr? Superclass { get; } = superclass;

@@ -1,4 +1,4 @@
-﻿namespace Lox;
+﻿namespace Lox.Runtime;
 
 public class LoxClass(string name, LoxObject? superclass, Dictionary<string, LoxFunction> methods) : ILoxCallable
 {
@@ -29,7 +29,7 @@ public class LoxClass(string name, LoxObject? superclass, Dictionary<string, Lox
     {
         LoxInstance instance = new(this);
         LoxFunction? initializer = FindMethod("init");
-        
+
         if (initializer != null)
         {
             initializer.Bind(instance).Call(interpreter, arguments);

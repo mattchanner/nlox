@@ -1,10 +1,8 @@
 ﻿using System.Text;
 
-using Lox.Lang;
-
 namespace Lox;
 
-public class Lox
+public class Program
 {
     private static LoxLang lox = new();
 

@@ -1,9 +1,8 @@
 ﻿using System.Globalization;
 using System.Reflection;
+using Lox.Parser;
 
-using Lox.Lang;
-
-namespace Lox;
+namespace Lox.Runtime;
 
 public class LoxNativeInstance
 {
@@ -15,13 +14,13 @@ public class LoxNativeInstance
         foreach (MethodInfo method in staticMethods)
         {
             string camelCase = method.Name.Substring(0, 1).ToLowerInvariant() + method.Name.Substring(1);
-            this.functions[camelCase] = new LoxNativeFunction(method);
+            functions[camelCase] = new LoxNativeFunction(method);
         }
     }
 
     public LoxObject? Get(Token name)
     {
-        LoxNativeFunction? func = this.functions.GetValueOrDefault(name.Lexeme);
+        LoxNativeFunction? func = functions.GetValueOrDefault(name.Lexeme);
         return func == null ? LoxObject.Nil : new LoxObject(func!);
     }
 }
@@ -32,15 +31,15 @@ public class LoxNativeFunction(MethodInfo method) : ILoxCallable
 
     public LoxObject? Call(Interpreter interpreter, List<LoxObject?> arguments)
     {
-        List<(LoxObject? First, ParameterInfo Second)> argsWithParam = 
+        List<(LoxObject? First, ParameterInfo Second)> argsWithParam =
             arguments.Zip(method.GetParameters()).ToList();
 
         object?[] coerced = argsWithParam.Select(Coerce).ToArray();
         object? result = method.Invoke(
-            null, 
-            BindingFlags.Static | BindingFlags.InvokeMethod, 
-            null, 
-            coerced, 
+            null,
+            BindingFlags.Static | BindingFlags.InvokeMethod,
+            null,
+            coerced,
             CultureInfo.CurrentCulture);
 
         if (result == null)
@@ -48,7 +47,7 @@ public class LoxNativeFunction(MethodInfo method) : ILoxCallable
         if (result is double d)
             return new LoxObject(d);
         if (result is int i)
-            return new LoxObject((double)i);
+            return new LoxObject(i);
         if (result is string s)
             return new LoxObject(s);
         if (result is bool b)

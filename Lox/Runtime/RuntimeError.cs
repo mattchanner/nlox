@@ -1,6 +1,6 @@
-﻿using Lox.Lang;
+﻿using Lox.Parser;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 public class RuntimeError : Exception
 {
@@ -10,7 +10,7 @@ public class RuntimeError : Exception
 
     public RuntimeError(Token token, string message) : base(message)
     {
-        this.Token = token;
+        Token = token;
     }
 
     public Token? Token { get; }

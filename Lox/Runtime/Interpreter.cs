@@ -1,6 +1,8 @@
-﻿using Lox.Lang;
+﻿using System.Data;
+using Lox.Ast;
+using Lox.Parser;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 {
@@ -12,22 +14,29 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
     public Interpreter(IReporter reporter)
     {
         this.reporter = reporter;
-        this.environment = globals;
-        this.globals.Define("clock", new LoxObject(new Clock()));
-        this.globals.Define("Math", new LoxObject(new LoxNativeInstance(typeof(Math))));
+        environment = globals;
+        globals.Define("clock", new LoxObject(new Clock()));
+        globals.Define("Math", new LoxObject(new LoxNativeInstance(typeof(Math))));
     }
 
     public void Reset()
     {
-        this.globals.Reset();
-        this.locals.Clear();
-        this.environment = this.globals;
+        globals.Reset();
+        locals.Clear();
+        environment = globals;
     }
 
     public void Interpret(List<Stmt> statements)
     {
         try
         {
+            if (statements.Any(s => s == null))
+            {
+                this.reporter.RuntimeError(new RuntimeError("Invalid program detected."));
+                return;
+            }
+
+
             foreach (Stmt stmt in statements)
             {
                 Execute(stmt);
@@ -47,15 +56,15 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
     {
         LoxObject? value = Evaluate(assignment.Value);
 
-        if (this.locals.TryGetValue(assignment, out int distance))
+        if (locals.TryGetValue(assignment, out int distance))
         {
-            this.environment.AssignAt(distance, assignment.Name, value);
+            environment.AssignAt(distance, assignment.Name, value);
         }
         else
         {
-            this.globals.Assign(assignment.Name, value);
+            globals.Assign(assignment.Name, value);
         }
-        
+
         return value;
     }
 
@@ -71,10 +80,10 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
             case TokenType.SLASH:
                 return left! / right!;
-            
+
             case TokenType.STAR:
                 return left! * right!;
-            
+
             case TokenType.PLUS:
                 return left! + right!;
 
@@ -83,31 +92,31 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
             case TokenType.PERCENT:
                 return left!.Modulus(right!);
-            
+
             case TokenType.GREATER:
                 return new LoxObject(left! > right!);
-            
+
             case TokenType.GREATER_EQUAL:
                 return new LoxObject(left! >= right!);
-            
+
             case TokenType.LESS:
                 return new LoxObject(left! < right!);
-            
+
             case TokenType.LESS_EQUAL:
                 return new LoxObject(left! <= right!);
-            
+
             case TokenType.BANG_EQUAL:
                 return new LoxObject(left! != right!);
-            
+
             case TokenType.EQUAL_EQUAL:
                 return new LoxObject(left! == right!);
-            
+
             default:
                 return null;
         }
     }
 
-    public LoxObject? VisitGrouping(GroupingExpr grouping) 
+    public LoxObject? VisitGrouping(GroupingExpr grouping)
         => Evaluate(grouping.Expression);
 
     public LoxObject? VisitLiteral(LiteralExpr literal) => literal.Value!;
@@ -123,9 +132,19 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
     public LoxObject? VisitFunction(FunctionStmt function)
     {
-        LoxFunction func = new(function, this.environment, false);
-        this.environment.Define(function.Name.Lexeme, new LoxObject(func));
+        LoxFunction func = new(function, environment, false);
+        environment.Define(function.Name.Lexeme, new LoxObject(func));
         return null;
+    }
+
+    public LoxObject? VisitBreak(BreakStmt breakStmt)
+    {
+        throw new BreakException();
+    }
+
+    public LoxObject? VisitContinue(ContinueStmt continueStmt)
+    {
+        throw new ContinueException();
     }
 
     public LoxObject? VisitIfStmt(IfStmt ifStatement)
@@ -143,7 +162,18 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
     {
         while (Evaluate(whileStatement.Condition)?.IsTruthy() ?? false)
         {
-            Execute(whileStatement.Body);
+            try
+            {
+                Execute(whileStatement.Body);
+            }
+            catch (BreakException)
+            {
+                break;
+            }
+            catch (ContinueException)
+            {
+                continue;
+            }
         }
 
         return null;
@@ -157,7 +187,7 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
             if (leftResult!.IsTruthy())
                 return leftResult;
         }
-        else 
+        else
         {
             if (!leftResult!.IsTruthy())
                 return leftResult;
@@ -208,18 +238,18 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
             }
         }
 
-        this.environment.Define(@class.Name.Lexeme, null);
+        environment.Define(@class.Name.Lexeme, null);
 
         if (@class.Superclass != null)
         {
-            this.environment = new(environment);
-            this.environment.Define("super", superclass);
+            environment = new(environment);
+            environment.Define("super", superclass);
         }
 
         Dictionary<string, LoxFunction> methods = new();
         foreach (FunctionStmt method in @class.Methods)
         {
-            LoxFunction func = new(method, this.environment, method.Name.Lexeme == "init");
+            LoxFunction func = new(method, environment, method.Name.Lexeme == "init");
             methods.Add(method.Name.Lexeme, func);
         }
 
@@ -227,10 +257,47 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
         if (superclass != null)
         {
-            this.environment = this.environment.Enclosing!;
+            environment = environment.Enclosing!;
         }
 
-        this.environment.Assign(@class.Name, new LoxObject(klass));
+        environment.Assign(@class.Name, new LoxObject(klass));
+
+        return null;
+    }
+
+    public LoxObject? VisitFor(ForStatement forStatement)
+    {
+        if (forStatement.Initializer != null)
+            Execute(forStatement.Initializer);
+
+        while (true)
+        {
+            try
+            {
+                Execute(forStatement.Body);
+
+                if (forStatement.Condition != null)
+                {
+                    LoxObject? result = Evaluate(forStatement.Condition);
+                    if (!(result!.IsBool))
+                        throw new RuntimeError(forStatement.Keyword, "for condition did not return a boolean.");
+
+                    if (!result.GetBool())
+                        break;
+                }
+
+            }
+            catch (BreakException)
+            {
+                break;
+            }
+            catch (ContinueException)
+            {
+            }
+
+            if (forStatement.Increment != null)
+                Execute(forStatement.Increment);
+        }
 
         return null;
     }
@@ -277,7 +344,7 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
     public LoxObject? VisitLambda(LambdaExpression lambda)
     {
-        LambdaFunction func = new(lambda, this.environment);
+        LambdaFunction func = new(lambda, environment);
         return new LoxObject(func);
     }
 
@@ -287,7 +354,7 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
         if (obj.IsInstance)
             return obj.GetLoxInstance().Get(getExpr.Name);
-        
+
         if (obj.IsNativeInstance)
             return obj.GetNativeInstance().Get(getExpr.Name);
         if (obj.IsList)
@@ -315,13 +382,14 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
     public LoxObject? VisitSuper(SuperExpr superExpr)
     {
-        int distance = this.locals[superExpr];
-        LoxClass? superclass = this.environment.GetAt(distance, "super")?.AsClass();
+        int distance = locals[superExpr];
+        LoxClass? superclass = environment.GetAt(distance, "base")?.AsClass();
 
-        LoxInstance instance = this.environment.GetAt(distance - 1, "this")!.AsLoxInstance()!;
+        LoxInstance instance = environment.GetAt(distance - 1, "self")!.AsLoxInstance()!;
         LoxFunction? method = superclass!.FindMethod(superExpr.Method.Lexeme);
 
-        if (method == null) {
+        if (method == null)
+        {
             throw new RuntimeError(superExpr.Method,
                 "Undefined property '" + superExpr.Method.Lexeme + "'.");
         }
@@ -344,11 +412,11 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
 
     public void ExecuteBlock(List<Stmt> statements, Environment env)
     {
-        Environment previous = this.environment;
+        Environment previous = environment;
 
         try
         {
-            this.environment = env;
+            environment = env;
             foreach (Stmt stmt in statements)
             {
                 Execute(stmt);
@@ -356,22 +424,22 @@ public class Interpreter : IExprVisitor<LoxObject?>, IStmtVisitor<LoxObject?>
         }
         finally
         {
-            this.environment = previous;
+            environment = previous;
         }
     }
 
     public void Resolve(Expr expr, int depth)
     {
-        this.locals.Add(expr, depth);
+        locals.Add(expr, depth);
     }
 
-    private LoxObject? LookUpVariable(Token name, Expr expr) 
+    private LoxObject? LookUpVariable(Token name, Expr expr)
     {
-        if (this.locals.TryGetValue(expr, out int depth))
+        if (locals.TryGetValue(expr, out int depth))
         {
-            return this.environment.GetAt(depth, name.Lexeme);
+            return environment.GetAt(depth, name.Lexeme);
         }
-    
-        return this.globals.Get(name);
+
+        return globals.Get(name);
     }
 }

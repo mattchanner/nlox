@@ -1,6 +1,6 @@
-﻿using Lox.Lang;
+﻿using Lox.Parser;
 
-namespace Lox;
+namespace Lox.Runtime;
 
 public class Environment
 {
@@ -12,15 +12,15 @@ public class Environment
 
     public Environment(Environment enclosing) => this.enclosing = enclosing;
 
-    public Environment? Enclosing => this.enclosing;
+    public Environment? Enclosing => enclosing;
 
     public void Reset()
     {
-        this.values.Clear();
+        values.Clear();
     }
 
-    public void Define(string name, LoxObject? value) 
-        => this.values[name] = value;
+    public void Define(string name, LoxObject? value)
+        => values[name] = value;
 
     public void AssignAt(int distance, Token name, LoxObject? value)
     {
@@ -30,15 +30,15 @@ public class Environment
 
     public void Assign(Token name, LoxObject? value)
     {
-        if (this.values.ContainsKey(name.Lexeme))
+        if (values.ContainsKey(name.Lexeme))
         {
-            this.values[name.Lexeme] = value;
+            values[name.Lexeme] = value;
             return;
         }
 
-        if (this.enclosing != null)
+        if (enclosing != null)
         {
-            this.enclosing.Assign(name, value);
+            enclosing.Assign(name, value);
             return;
         }
 
@@ -47,15 +47,16 @@ public class Environment
 
     public LoxObject? GetAt(int distance, string name)
     {
-        var env = Ancestor(distance); 
+        var env = Ancestor(distance);
         return env.values[name];
     }
 
     public Environment Ancestor(int distance)
     {
         Environment? environment = this;
-        for (int i = 0; i < distance; i++) {
-            environment = environment!.enclosing; 
+        for (int i = 0; i < distance; i++)
+        {
+            environment = environment!.enclosing;
         }
 
         return environment!;
@@ -63,11 +64,11 @@ public class Environment
 
     public LoxObject? Get(Token name)
     {
-        if (this.values.TryGetValue(name.Lexeme, out LoxObject? value))
+        if (values.TryGetValue(name.Lexeme, out LoxObject? value))
             return value;
 
-        if (this.enclosing != null)
-            return this.enclosing.Get(name);
+        if (enclosing != null)
+            return enclosing.Get(name);
 
         throw new RuntimeError(name, $"Undefined variable '{name.Lexeme}'.");
     }

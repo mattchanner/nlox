@@ -1,4 +1,6 @@
-﻿namespace Lox;
+﻿using Lox.Ast;
+
+namespace Lox.Runtime;
 
 /// <summary>
 /// Lambda function implementation

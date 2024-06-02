@@ -1,4 +1,6 @@
-﻿namespace Lox.Lang;
+﻿using Lox.Runtime;
+
+namespace Lox.Parser;
 
 public class Scanner(string source, IReporter reporter)
 {
@@ -15,12 +17,14 @@ public class Scanner(string source, IReporter reporter)
         { "or", TokenType.OR },
         { "print", TokenType.PRINT },
         { "return", TokenType.RETURN },
-        { "super", TokenType.SUPER },
-        { "this", TokenType.THIS },
+        { "base", TokenType.SUPER },
+        { "self", TokenType.THIS },
         { "true", TokenType.TRUE },
-        { "var", TokenType.VAR },
+        { "let", TokenType.VAR },
         { "while", TokenType.WHILE },
-        { "lambda", TokenType.LAMBDA }
+        { "lambda", TokenType.LAMBDA },
+        { "break", TokenType.BREAK },
+        { "continue", TokenType.CONTINUE }
     };
 
     private readonly List<Token> tokens = [];
@@ -33,15 +37,15 @@ public class Scanner(string source, IReporter reporter)
     {
         while (!IsAtEnd())
         {
-            this.start = this.current;
+            start = current;
             ScanToken();
         }
 
-        this.tokens.Add(new Token(TokenType.EOF, "", null, line));
-        return this.tokens;
+        tokens.Add(new Token(TokenType.EOF, "", null, line));
+        return tokens;
     }
 
-    private bool IsAtEnd() => this.current >= source.Length;
+    private bool IsAtEnd() => current >= source.Length;
 
     private void ScanToken()
     {
@@ -105,7 +109,7 @@ public class Scanner(string source, IReporter reporter)
             case '\t':
                 break;
             case '\n':
-                this.line++;
+                line++;
                 break;
             case '"':
                 String();
@@ -121,7 +125,7 @@ public class Scanner(string source, IReporter reporter)
                 }
                 else
                 {
-                    reporter.Error(this.line, $"Unexpected character '{c}'");    
+                    reporter.Error(line, $"Unexpected character '{c}'");
                 }
                 break;
         }
@@ -132,7 +136,7 @@ public class Scanner(string source, IReporter reporter)
         while (IsAlphanumeric(Peek()))
             Advance();
 
-        string text = source.Substring(this.start, this.current - this.start);
+        string text = source.Substring(start, current - start);
 
         TokenType type = keywords.GetValueOrDefault(text, TokenType.IDENTIFIER);
 
@@ -153,8 +157,8 @@ public class Scanner(string source, IReporter reporter)
         }
 
         AddToken(
-            TokenType.NUMBER, 
-            new LoxObject(double.Parse(source.Substring(this.start, this.current - this.start))));
+            TokenType.NUMBER,
+            new LoxObject(double.Parse(source.Substring(start, current - start))));
     }
 
     private bool IsAlphanumeric(char c) => IsAlpha(c) || IsDigit(c);
@@ -163,8 +167,8 @@ public class Scanner(string source, IReporter reporter)
 
     private bool IsAlpha(char c)
     {
-        return (c >= 'a' && c <= 'z')
-            || (c >= 'A' && c <= 'Z')
+        return c >= 'a' && c <= 'z'
+            || c >= 'A' && c <= 'Z'
             || c == '_';
     }
 
@@ -173,46 +177,46 @@ public class Scanner(string source, IReporter reporter)
         while (Peek() != '"' && !IsAtEnd())
         {
             if (Peek() == '\n')
-                this.line++;
+                line++;
             Advance();
         }
 
         if (IsAtEnd())
         {
-            reporter.Error(this.line, "Unterminated string.");
+            reporter.Error(line, "Unterminated string.");
             return;
         }
 
         Advance();
 
-        string value = source.Substring(this.start + 1, this.current - 2 - this.start);
+        string value = source.Substring(start + 1, current - 2 - start);
         AddToken(TokenType.STRING, new LoxObject(value));
     }
 
     private char PeekNext()
     {
-        if (this.current + 1 > source.Length) return '\0';
-        return source[this.current + 1];
+        if (current + 1 > source.Length) return '\0';
+        return source[current + 1];
     }
 
     private char Peek()
     {
         if (IsAtEnd()) return '\0';
-        return source[this.current];
+        return source[current];
     }
 
     private bool Match(char expected)
     {
         if (IsAtEnd()) return false;
         if (source[current] != expected) return false;
-        this.current++;
+        current++;
         return true;
     }
 
     private char Advance()
     {
         //if (IsAtEnd()) return '\0';
-        return source[this.current++];
+        return source[current++];
     }
 
     private void AddToken(TokenType type)
@@ -223,6 +227,6 @@ public class Scanner(string source, IReporter reporter)
     private void AddToken(TokenType type, LoxObject? literal)
     {
         string text = source.Substring(start, current - start);
-        this.tokens.Add(new Token(type, text, literal, line));
+        tokens.Add(new Token(type, text, literal, line));
     }
 }

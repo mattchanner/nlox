@@ -1,4 +1,4 @@
-﻿namespace Lox;
+﻿namespace Lox.Runtime;
 
 public enum LoxType
 {
