@@ -1,10 +1,9 @@
 ﻿using Lox.Ast;
-using Lox.Runtime;
+using Lox.Parser;
 
-namespace Lox.Parser;
+namespace Lox.Runtime;
 
-public class Resolver(Interpreter interpreter, IReporter reporter) 
-    : IExprVisitor<object?>, IStmtVisitor<object?>
+public class Resolver(Interpreter interpreter, IReporter reporter) : IExprVisitor<object?>, IStmtVisitor<object?>
 {
     private readonly Stack<Dictionary<string, bool>> scopes = new();
     private FunctionType currentFunction = FunctionType.None;
@@ -355,8 +354,6 @@ public class Resolver(Interpreter interpreter, IReporter reporter)
 
     private void ResolveLocal(Expr expr, Token name)
     {
-        int steps = 0;
-        //for (int i = scopes.Count - 1; i >= 0; i--)
         for (int i = 0; i < scopes.Count; i++)
         {
             if (scopes.ElementAt(i).ContainsKey(name.Lexeme))
@@ -364,8 +361,6 @@ public class Resolver(Interpreter interpreter, IReporter reporter)
                 interpreter.Resolve(expr, i);
                 return;
             }
-
-            steps++;
         }
     }
 
